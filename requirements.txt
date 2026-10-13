@@ -1,0 +1,2 @@
+pyspellchecker==0.9.1
+ortools==9.15.6755
