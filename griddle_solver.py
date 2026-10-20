@@ -10,21 +10,16 @@ import json
 from pathlib import Path
 import sys
 from typing import Any
+import config
 
 from ortools.sat.python import cp_model
 from spellchecker import SpellChecker
 
 
-MODIFIERS = {None, "DL", "TL", "DW", "TW"}
+
 VOWELS = frozenset("aeiouy")
-LETTER_VALUES = {
-    letter: value
-    for letters, value in (
-        ("aeiolstr", 1), ("dnug", 2), ("bcp", 3), ("fhvmwy", 4),
-        ("k", 5), ("jx", 8), ("qz", 10),
-    )
-    for letter in letters
-}
+TILE_MODIFIERS = {None, "DL", "TL", "DW", "TW"}
+
 Grid = list[list[str | None]]
 
 
@@ -34,6 +29,13 @@ class InputError(ValueError):
 
 class InvalidBoard(ValueError):
     pass
+
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, complex):
+            return [obj.real, obj.imag]
+        # Let the base class default method raise the TypeError
+        return super().default(obj)
 
 
 @dataclass(frozen=True)
@@ -46,11 +48,12 @@ class Puzzle:
         return Counter(self.letters)
 
 
-def parse_puzzle(letters: str, modifiers: object = None) -> Puzzle:
+def parse_puzzle(letters: str) -> Puzzle:
     if not isinstance(letters, str) or not 8 <= len(letters) <= 10:
         raise InputError("Supply 8-10 letter tiles.")
     if not letters.isascii() or not letters.isalpha():
         raise InputError("Tiles must be ASCII English letters without spaces or blanks.")
+    modifiers = config.BOARD_MODIFIERS
     if modifiers is None:
         modifiers = [[None] * 4 for _ in range(4)]
     if not isinstance(modifiers, list) or len(modifiers) != 4:
@@ -60,7 +63,7 @@ def parse_puzzle(letters: str, modifiers: object = None) -> Puzzle:
         if not isinstance(row, list) or len(row) != 4:
             raise InputError("Modifier board must be a 4x4 JSON array.")
         for column_index, modifier in enumerate(row):
-            if not (modifier is None or isinstance(modifier, str)) or modifier not in MODIFIERS:
+            if not (modifier is None or isinstance(modifier, str)) or modifier not in TILE_MODIFIERS:
                 raise InputError(
                     f"Invalid modifier at [{row_index}, {column_index}]; "
                     "use null, DL, TL, DW, or TW, with one modifier per cell."
@@ -75,7 +78,7 @@ def word_allowed(word: str, vocabulary: set[str]) -> bool:
         and word.isascii()
         and word.isalpha()
         and word in vocabulary
-        and (len(word) != 2 or bool(VOWELS.intersection(word)))
+        and (bool(VOWELS.intersection(word)))
     )
 
 
@@ -87,7 +90,7 @@ def filter_vocabulary(words: Iterable[str], inventory: Counter[str]) -> set[str]
             2 <= len(word) <= 4
             and word.isascii()
             and word.isalpha()
-            and (len(word) != 2 or VOWELS.intersection(word))
+            and (bool(VOWELS.intersection(word)))
             and not Counter(word) - inventory
         ):
             accepted.add(word)
@@ -164,7 +167,7 @@ def evaluate_board(puzzle: Puzzle, board: Grid, vocabulary: set[str]) -> dict[st
         word_multiplier = 1
         for letter, (row, column) in zip(spelling, coordinates):
             modifier = puzzle.modifiers[row][column]
-            letter_total += LETTER_VALUES[letter] * {"DL": 2, "TL": 3}.get(modifier, 1)
+            letter_total += config.LETTER_VALUES[letter] * {"DL": 2, "TL": 3}.get(modifier, 1)
             word_multiplier *= {"DW": 2, "TW": 3}.get(modifier, 1)
         words.append({
             "spelling": spelling.upper(), "direction": direction,
@@ -249,7 +252,7 @@ def line_score(pattern: LinePattern, alphabet: tuple[str, ...], modifiers: tuple
         subtotal = 0
         multiplier = 1
         for offset in range(start, end):
-            value = LETTER_VALUES[alphabet[pattern.cells[offset]]]
+            value = config.LETTER_VALUES[alphabet[pattern.cells[offset]]]
             modifier = modifiers[offset]
             if modifier == "DL":
                 value *= 2
@@ -359,7 +362,8 @@ class PuzzleArgumentParser(argparse.ArgumentParser):
 
 def render_result(result: dict[str, Any], json_mode: bool) -> None:
     if json_mode:
-        print(json.dumps(result, indent=2))
+        with open("output.json", "w", encoding="utf-8") as file:
+            json.dump(result, file, indent=4)
         return
     if result["status"] != "optimal":
         print(f"{result['status']}: {result['message']}")
@@ -378,21 +382,11 @@ def main(argv: list[str] | None = None) -> int:
     json_mode = "--json" in arguments
     parser = PuzzleArgumentParser(description="Find a proven maximum-score legal Griddle layout.", allow_abbrev=False)
     parser.add_argument("--letters", required=True, help="8-10 ASCII letter tiles, without spaces")
-    parser.add_argument("--modifiers", type=Path, help="JSON file containing a 4x4 null/DL/TL/DW/TW matrix")
-    parser.add_argument("--omit", type=Path, help="headerless CSV file of words to exclude; every cell is a word")
+    parser.add_argument("--omit", type=Path, default="exclude.csv", help="headerless CSV file of words to exclude; every cell is a word")
     parser.add_argument("--json", action="store_true", help="emit structured JSON results and errors")
     try:
         options = parser.parse_args(arguments)
-        modifiers = None
-        if options.modifiers is not None:
-            try:
-                with options.modifiers.open(encoding="utf-8") as stream:
-                    modifiers = json.load(stream)
-            except (OSError, UnicodeError, ValueError) as error:
-                raise InputError(f"Cannot read modifier board: {error}") from error
-            if modifiers is None:
-                raise InputError("Modifier file must contain a 4x4 JSON array, not null.")
-        puzzle = parse_puzzle(options.letters, modifiers)
+        puzzle = parse_puzzle(options.letters)
         omitted_words = load_exclusions(options.omit) if options.omit is not None else None
         result = solve_puzzle(puzzle, omitted_words=omitted_words)
         exit_code = {"optimal": 0, "no_solution": 1, "inconclusive": 3}[result["status"]]

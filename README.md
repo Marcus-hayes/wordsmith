@@ -27,12 +27,12 @@ From the repository root with the virtual environment active:
 ```sh
 python griddle_solver.py --letters ABXXXXXX
 python griddle_solver.py --letters ABXXXXXX --json
-python griddle_solver.py --letters ABXXXXXX --modifiers examples/modifiers.json --json
+python griddle_solver.py --letters ABXXXXXX --json
 python griddle_solver.py --help
 ```
 
-Replace the sample inventory with your daily tiles. The modifier example below is
-also provided as `examples/modifiers.json` for the third command.
+Replace the sample inventory with your daily tiles. Tile modifiers and letter-score 
+values are configured in inputs/config.py and can be altered depending on your game instance.
 
 Readable output shows a 4x4 grid with `.` for empty cells, total score, unused
 tiles, and each word's spelling, direction, zero-based coordinates, and score.
@@ -57,19 +57,26 @@ optimal grid. Native solving may take time to yield control to the interrupt.
 
 ## Exclusion CSV Format
 
-Use optional `--omit <csv-path>` to exclude words before solving. From the
-repository root with the virtual environment active:
+The `spellchecker` Python lib used in this project will validate letter 
+permutations as words that may not be considered valid by the word game.
+To counter this:
+1. words are validated against names from the `name_dataset` Python lib 
+2. An optional CLI parameter was added to accept a CSV file of letter
+permutations for exclusion 
+
+Provide the `--omit <csv-path>` argument to exclude words before solving. 
+
+From the repository root with the virtual environment active:
 
 ```sh
-python griddle_solver.py --letters ABXXXXXX --omit examples/exclude.csv
-python griddle_solver.py --letters ABXXXXXX --modifiers examples/modifiers.json --omit examples/exclude.csv --json
+python griddle_solver.py --letters ABXXXXXX --omit exclude.csv
+python griddle_solver.py --letters ABXXXXXX --omit exclude.csv --json
 ```
 
-The project-local example excludes DUNN. To use your separate user-managed file,
-pass its path explicitly:
+To use your separate user-managed file, pass its path explicitly:
 
 ```sh
-python griddle_solver.py --letters ABCXXXXX --modifiers examples/modifiers.json --omit examples/exclude.csv
+python griddle_solver.py --letters ABCXXXXX --omit custom_dir/exclude.csv
 ```
 
 Relative paths are resolved from the command's working directory; absolute paths
@@ -123,7 +130,7 @@ Vocabulary is exact membership in PySpellchecker's pinned English dictionary,
 not spelling suggestions and not necessarily the official Griddle vocabulary.
 Two-letter words must contain A, E, I, O, U, or Y; Y is treated as a vowel.
 
-The optional modifier file is a JSON array of four rows with four cells each.
+Tile modifiers are representing as a 2D JSON array of four rows with four cells each.
 Each cell is `null`, `DL`, `TL`, `DW`, or `TW`; combinations are rejected.
 Coordinates are zero-based `[row, column]`. For example:
 
@@ -162,13 +169,17 @@ independent result auditing, exhaustive optimality comparisons, and CLI output.
 
 Observed on the tested macOS/Python environment using eight CP-SAT workers:
 
-| Tiles | Inventory | Modifiers | Proven Score | Solve Seconds |
-| --- | --- | --- | --- | --- |
-| 8 | `CATBYMYX` | None | 39 | 3.122 |
-| 9 | `CATBYMYXS` | None | 45 | 5.715 |
-| 10 | `CATBYMYXSE` | `examples/modifiers.json` | 118 | 13.063 |
+| Tiles | Inventory | Proven Score | Solve Seconds |
+| --- | --- | --- | --- |
+| 8 | `CATBYMYX` | 39 | 3.122 |
+| 9 | `CATBYMYXS` | 45 | 5.715 |
+| 10 | `CATBYMYXSE` | 118 | 13.063 |
 
 Times include dictionary loading, model construction, optimization, and the
 solver's result audit. Each result was also checked by a separate evaluator
 invocation. These are observations, not runtime guarantees; other puzzles or
 machines can take substantially longer. Tied optimal grids can differ by run.
+
+## Feature Ideas
+* Connect to Discord API and solve puzzle remotely; Would require API integration with puzzle, but could auto-submit answers and expand exclusion list when applicable
+* Solve different word puzzle types
