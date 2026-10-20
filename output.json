@@ -1,1 +1,71 @@
-"[\n  \"status\",\n  \"grid\",\n  \"total_score\",\n  \"unused_tiles\",\n  \"words\"\n]"
+{
+    "status": "optimal",
+    "grid": [
+        ["J", "A", null, null],
+        ["A", "R", null, null],
+        ["C", null, null, "O"],
+        ["K", "E", "C", "K"]
+    ],
+    "total_score": 91,
+    "unused_tiles": "",
+    "words": [
+        {
+            "spelling": "JA",
+            "direction": "horizontal",
+            "coordinates": [
+                [0, 0],
+                [0, 1]
+            ],
+            "score": 11
+        },
+        {
+            "spelling": "AR",
+            "direction": "horizontal",
+            "coordinates": [
+                [1, 0],
+                [1, 1]
+            ],
+            "score": 2
+        },
+        {
+            "spelling": "KECK",
+            "direction": "horizontal",
+            "coordinates": [
+                [3, 0],
+                [3, 1],
+                [3, 2],
+                [3, 3]
+            ],
+            "score": 30
+        },
+        {
+            "spelling": "JACK",
+            "direction": "vertical",
+            "coordinates": [
+                [0, 0],
+                [1, 0],
+                [2, 0],
+                [3, 0]
+            ],
+            "score": 40
+        },
+        {
+            "spelling": "AR",
+            "direction": "vertical",
+            "coordinates": [
+                [0, 1],
+                [1, 1]
+            ],
+            "score": 2
+        },
+        {
+            "spelling": "OK",
+            "direction": "vertical",
+            "coordinates": [
+                [2, 3],
+                [3, 3]
+            ],
+            "score": 6
+        }
+    ]
+}

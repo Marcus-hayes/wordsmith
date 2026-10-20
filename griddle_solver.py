@@ -9,6 +9,7 @@ from itertools import product
 import json
 from pathlib import Path
 import sys
+import re
 from typing import Any
 import config
 
@@ -364,7 +365,17 @@ def render_result(result: dict[str, Any], json_mode: bool) -> None:
     if json_mode:
         with open("output.json", "w", encoding="utf-8") as file:
             json.dump(result, file, indent=4)
+        with open("output.json", "r", encoding="utf-8") as file:
+            content = file.read()
+        content = re.sub(
+            r'\[\s*((?:"[^"]*"|null|true|false|-?\d+(?:\.\d+)?)(?:\s*,\s*(?:"[^"]*"|null|true|false|-?\d+(?:\.\d+)?))*)\s*\]',
+            lambda m: "[" + re.sub(r"\s+", " ", m.group(1)).strip() + "]",
+            content
+        )
+        with open("output.json", "w", encoding="utf-8") as file:
+            file.write(content)
         return
+    
     if result["status"] != "optimal":
         print(f"{result['status']}: {result['message']}")
         return
@@ -382,8 +393,8 @@ def main(argv: list[str] | None = None) -> int:
     json_mode = "--json" in arguments
     parser = PuzzleArgumentParser(description="Find a proven maximum-score legal Griddle layout.", allow_abbrev=False)
     parser.add_argument("--letters", required=True, help="8-10 ASCII letter tiles, without spaces")
-    parser.add_argument("--omit", type=Path, default="exclude.csv", help="headerless CSV file of words to exclude; every cell is a word")
-    parser.add_argument("--json", action="store_true", help="emit structured JSON results and errors")
+    parser.add_argument("--omit", type=Path, default="exclude.csv", help="[Optional] Headerless CSV file of words to exclude")
+    parser.add_argument("--json", action="store_true", help="[Optional] Emit structured results and errors as a JSON file")
     try:
         options = parser.parse_args(arguments)
         puzzle = parse_puzzle(options.letters)
